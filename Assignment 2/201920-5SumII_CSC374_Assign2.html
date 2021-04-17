@@ -1,0 +1,383 @@
+<!doctype html>
+<html lang="en_US">
+
+ <head>
+  <meta http-equiv="content-type" content="text/html; charset=ISO-8859-1">
+  <title>CSC 374: Computer Systems II: 2020 Summer II, Assignment #2</title>
+ </head>
+
+ <body>
+  <center>
+  <h2>CSC 374: Computer Systems II: 2020 Summer II, Assignment #2</h2>
+  <p>Last Modified 2020 July 29</p>
+  </center>
+
+  <h4>Purpose:</h4>
+   To practice creating processes and signal handling.
+
+  <h4>Computing</h4>
+  <p>
+  Please <a href="">ssh</a> into one of the following:
+    <ul>
+      <li>140.192.36.184</li>
+      <li>140.192.36.185</li>
+      <li>140.192.36.186</li>
+    </ul>
+  or use your own Un*x machine (<em>e.g.</em> Linux or MacOS)
+  </p>
+
+  <h4>Overview:</h4>
+  <p>
+    We will write <em>three</em> programs:
+    <ol type="1">
+      <li>
+	<code>first.c</code> has a global <code>int</code> variable called
+	<code>turn</code> that is initialized to <code>0</code>.
+	In a loop it makes a child that runs <code>second</code>.
+	It waits for signals from its child to go to the next loop iteration,
+	or to quit the loop.
+      </li>
+      <li>
+	<code>second.c</code> also has a global <code>int</code> variable called
+	<code>turn</code> but it initialized from its command line argument.
+	It makes a child that runs <code>third</code>.
+	It waits for a signal from its child to send its own parent a signal.
+	Then it quits.
+      </li>
+      <li>
+	<code>third.c</code>  has a <code>int</code> variable called
+	<code>turn</code> that is also initialized from its command line
+	argument.
+	It sends a signal to its parent based upon turn.
+	Then it quits.
+      </li>
+    </ol>
+  </p>
+
+  <h4>Protocol:</h4>
+  <p>
+    <pre>
+first
+  |
+  |
+  | prints &quot;turn = 0&quot;
+  |
+  |
+  |		     second
+  +--------------------&gt;|
+  | launches second w/	|
+  |  &quot;0&quot; on cmd line	|
+  |			|
+  |			| prints &quot;turn = 0&quot;
+  |			|
+  |			|
+  |			|		    third
+  |			+--------------------&gt;|
+  |			| launches third w/   |
+  |			|  &quot;0&quot; on cmd line    |
+  |			|		      | prints &quot;turn = 0&quot;
+  |			|		      |
+  |			|		      |
+  |			|	SIGUSR1	      |
+  |			|&lt;--------------------+ sends SIGUSR1 to parent
+  |			|		    quits
+  |			|
+  |			| prints &quot;turn = 1&quot;
+  |			|
+  |&lt;--------------------+ sends SIGUSR1 to parent
+  |			| 
+  |			| receives stopped child
+  |		      quits
+  |
+  | prints &quot;turn = 1&quot;
+  |
+  |		     second
+  +--------------------&gt;|
+  | launches second w/	|
+  |  &quot;1&quot; on cmd line	|
+  |			|
+  |			| prints &quot;turn = 1&quot;
+  |			|
+  |			|
+  |			|		    third
+  |			+--------------------&gt;|
+  |			| launches third w/   |
+  |			|  &quot;1&quot; on cmd line    |
+  |			|		      | prints &quot;turn = 1&quot;
+  |			|		      |
+  |			|		      |
+  |			|	SIGUSR2	      |
+  |			|&lt;--------------------+ sends SIGUSR2 to parent
+  |			|		    quits
+  |			|
+  |			| prints &quot;turn = 2&quot;
+  |			|
+  |&lt;--------------------+ sends SIGUSR2 to parent
+  |			| 
+  |			| receives stopped child
+  |		      quits
+  |
+  | prints &quot;turn = 2&quot;
+  |
+  | quits loop
+  |
+  | receives 1st stopped child
+  | receives 2nd stopped child
+quits
+    </pre>
+  </p>
+
+  <h4>Assignment:</h4>
+  <ol type="1">
+    <li>
+      <h5>Copy and paste the following (<code>first.c</code>):</h5>
+      <pre>
+#include	&lt;stdlib.h&gt;
+#include	&lt;stdio.h&gt;
+#include	&lt;string.h&gt;
+#include	&lt;unistd.h&gt;
+#include	&lt;wait.h&gt;
+
+const int	TEXT_LEN	= 256;
+
+int		turn		= 0;
+
+void		sigUsr1Handler	(int	sigNum
+				)
+{
+  <strong>//  YOUR CODE HERE</strong>
+}
+
+
+void		sigUsr2Handler	(int	sigNum
+				)
+{
+  <strong>//  YOUR CODE HERE</strong>
+}
+
+
+int		main		()
+{
+  struct sigaction	act;
+
+  <strong>//  YOUR CODE HERE</strong>
+  <strong>//  Install sigUsr1Handler() and handler for SIGUSR1</strong>
+  <strong>//  Install sigUsr2Handler() and handler for SIGUSR2</strong>
+  
+
+  printf(&quot;first: turn = %d\n&quot;,turn);
+
+  while  (turn &lt; 2)
+  {
+    int	oldTurn	= turn;
+
+    <strong>//  YOUR CODE HERE</strong>
+    <strong>//  Make a child process.</strong>
+    <strong>//  Have the child run &quot;./second&quot; and</strong>
+    <strong>//  pass it the value of turn (as a string) on the command line</strong>
+
+    while  (turn == oldTurn)
+    {
+      sleep(1);
+    }
+
+    printf(&quot;first: turn = %d\n&quot;,turn);
+  }
+ 
+  <strong>//  YOUR CODE HERE</strong>
+  <strong>//  Wait for both children to end</strong>
+  return(EXIT_SUCCESS);
+}
+      </pre>
+    </li>
+    <p/>
+
+    <li>
+      <h5>Finish <code>first.c</code>:</h5>
+      <ol type="a">
+	<li>
+	  <code>sigUsr1Handler()</code> should set <code>turn</code> to <code>1</code>.
+	</li>
+	<p/>
+
+	<li>
+	  <code>sigUsr2Handler()</code> should set <code>turn</code> to <code>2</code>.
+	</li>
+	<p/>
+
+	<li>
+	  <code>main()</code> should:
+	  <ol type="1">
+	    <li>
+	      Install <code>sigUsr1Handler()</code> as the <code>SIGUSR1</code>
+	      handler and <code>sigUsr2Handler()</code>
+	       as the <code>SIGUSR2</code>.
+	    </li>
+	    <li>Output the current value of <code>turn</code> (already done)</li>
+	    <li>
+	      In a loop, make a child process.
+	      The child process should run <code>./second</code>.
+	      It should also be given the current value of <code>turn</code>
+	      on its command line.
+	      To do this we need to create a string that has the value of
+	      <code>turn</code>.
+	      One way of doing this is with:
+	      <pre>
+char	text[TEXT_LEN];
+
+snprintf(text,TEXT_LEN,&quot;%d&quot;,turn);
+	      </pre>
+
+	      The loop should also wait for the value of <code>turn</code>
+	      to change,
+	      which signifies that a signal was received.
+	      (already done).
+	    </li>
+	    <li>
+	      After the loop, <code>main()</code>
+	      should wait for both of the child processes it made.
+	    </li>
+	  </ol>
+	</li>
+      </ol>
+    </li>
+    <p/>
+
+    <li>
+      <h5>Write <code>second.c</code>:</h5>
+      <ol type="a">
+	<li>
+	  Like with <code>first.c</code> there is a global variable
+	  <code>turn</code> and 2 signal handlers.
+	  Like with <code>first.c</code>,
+	  the <code>SIGUSR1</code> handler should set <code>turn</code> to <code>1</code>
+	  and the <code>SIGUSR2</code> handler should set <code>turn</code> to <code>2</code>.
+	</li>
+	<p/>
+
+	<li>
+	  <code>main()</code> should:
+	  <ol type="1">
+	    <li>
+	      Inspect its command line arguments.
+	      It needs one because it tells the value of <code>turn</code>.
+	      If the argument is not given then it should do:
+	      <pre>
+    fprintf(stderr,&quot;Missing command line argument for second\n&quot;);
+    exit(EXIT_FAILURE);</pre>
+	      If the argument is given then it should set <code>turn</code>
+	      to the the integer given in the string.
+	    </li>
+	    <li>
+	      Install both signal handlers
+	    </li>
+	    <li>Output the current value of <code>turn</code></li>
+	    <li>
+	      Just once, make a child process.
+	      The child process should run <code>./third</code>.
+	      It should also be given the current value of <code>turn</code>
+	      on its command line.
+	      (See above.)
+	    </li>
+	    <li>
+	      Wait for <code>turn</code> to change.
+	      Look how I did this in <code>first.c</code> using <code>oldTurn</code>.
+	      Be sure to initialize <code>oldTurn</code>
+	      before making the child process.
+	    </li>
+	    <li>
+	      After the waiting loop then output the new value of <code>turn</code>.
+	    </li>
+	    <li>
+	      Send <code>SIGUSR1</code> to the parent process if
+	      <code>turn</code> is <code>1</code> or <code>SIGUSR2</code>
+	      otherwise.
+	    </li>
+	    <li>
+	      Wait for the child process to finish.
+	    </li>
+	    <li>
+	      Return <code>EXIT_SUCCESSS</code> to the OS and quit.
+	    </li>
+	  </ol>
+	</li>
+      </ol>
+    </li>
+    <p/>
+
+    <li>
+      <h5>Write <code>third.c</code>:</h5>
+      <ol type="a">
+	<li>
+	  Unlike <code>first.c</code> and <code>second.c</code>,
+	  <code>third.c</code> does not need either signal handler.
+	</li>
+	<li>
+	  However, like <code>second.c</code>, <code>third.c</code>
+	  does need to check command line arguments and set <code>turn</code>
+	  accordingly.
+	</li>
+	<li>Output the current value of <code>turn</code></li>
+	<li>
+	  Send <code>SIGUSR1</code> to the parent process if
+	  <code>turn</code> is <code>0</code> or <code>SIGUSR2</code>
+	  otherwise.
+	</li>
+	<li>
+	  Return <code>EXIT_SUCCESSS</code> to the OS and quit.
+	</li>
+      </ol>
+    </li>
+  </ol>
+   
+  <h4>How to make the program:</h4>
+  <pre>
+$ <strong>gcc first.c -o first</strong>
+$ <strong>gcc second.c -o second</strong>
+$ <strong>gcc third.c -o third</strong>
+$ <strong>./first</strong>
+  </pre>
+
+  <h4>In another window moniter it:</h4>
+  <pre>
+$ <strong>ps aux| grep first</strong>
+$ <strong>ps aux| grep second</strong>
+$ <strong>ps aux| grep third</strong>
+  </pre>
+  <em>Very important!</em>
+  During debugging, you may have rogue processes.
+  <em>You must</em> kill them with
+  <pre>
+$ <strong>kill -9 <em>processIdNumber</em></strong></pre>
+  <em>
+    because if you make too many the OS will
+    <strong>not</strong> let you make any more, and
+    <strong>not</strong> even let you login!
+  </em>
+  <p/>
+
+  <p>
+    <h4>Sample output:</h4>
+    <pre>
+$ <strong>./first </strong>
+first: turn = 0
+second: turn = 0
+third: turn = 0
+third: sending 10 to parent
+second: turn = 1
+second: sending 10 to parent
+second: received child 6288
+first: turn = 1
+second: turn = 1
+third: turn = 1
+third: sending 12 to parent
+second: turn = 2
+second: sending 12 to parent
+second: received child 6290
+first: turn = 2
+first: received child 6287
+first: received child 6289
+    </pre>
+  </p>
+ </body>
+</html>

@@ -1,0 +1,743 @@
+<!doctype html>
+<html lang="en_US">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"> 
+    <title>CSC 374: Computer Systems II: 2020 Summer II, Assignment #3</title>
+    <style>
+      H2 { text-align: center }
+      H3 { text-align: center }
+    </style>
+  </head>
+
+  <body>
+    <h2>CSC 374: Computer Systems II: 2020 Summer II<br/>Assignment #3</h2>
+    <h3>Last Modified 2020 August 10</h3>
+
+    <h4>Purpose:</h4>
+    To go over:
+    <ul>
+      <li>Threads</li>
+      <li>Memory management</li>
+    </ul>
+
+    <h4>Computing</h4>
+    <p>
+      Please <a href="http://www.putty.org/">ssh</a> into one of the following:
+      <ul>
+	<li>140.192.36.184</li>
+	<li>140.192.36.185</li>
+	<li>140.192.36.186</li>
+	<li>140.192.36.187</li>
+      </ul>
+      or use your own Unix machine.
+    </p>
+
+    <p>
+      Please submit the source file <code>hungryBees.cpp</code>
+    </p>
+
+    <ol type="1">
+      <li>
+	<h4>hungryBees.cpp (100 Points)</h4>
+	<ol type="A">
+	  <li>
+	    <h5>Overview:</h5>
+	    There is a farmer who wants honey.<br/>
+	    There are 4 bee hives that are willing to give honey,
+	    but want flowers in return.
+	    <ul>
+	      <li>
+		The <em>farmer</em> thread runs a loop that only stops when:
+		<code>honey &gt;= NUM_BEE_HIVES</code>.
+		Until then, the farmer patiently makes another flower
+		with <code>new Flower</code> and gives it to one of the
+		bee hives.
+	      </li>
+	      <li>
+		The <em>bee hive</em> threads collect <code>Flower</code>
+		instances
+		and add them to their own personal <code>PrivateGarden</code>
+		instances.
+		When their <code>PrivateGarden</code> instances have
+		<code>NUM_FLOWERS_TO_COLLECT</code> flowers,
+		then they increment the <code>honey</code> counter for the
+		farmer.
+	      </li>
+	    </ul>
+	  </li>
+	  <p/>
+
+	  <li>
+	    <h5>Cut-and-paste the following:</h5>
+	    <pre>
+/*-------------------------------------------------------------------------*
+ *---									---*
+ *---		hungryBees.cpp						---*
+ *---									---*
+ *---	    This file defines a C-ish C++ program that exercises	---*
+ *---	knowledge ofPOSIX threads and linked list manipulation.		---*
+ *---									---*
+ *---	----	----	----	----	----	----	----	----	---*
+ *---									---*
+ *---	Version 1a					Joseph Phillips	---*
+ *---									---*
+ *-------------------------------------------------------------------------*/
+
+//  Compile with:
+//  $ g++ hungryBees.cpp -o hungryBees -lpthread
+
+//---			Header file inclusion:				---//
+ 
+#include	&lt;stdlib.h&gt;
+#include	&lt;stdio.h&gt;
+#include	&lt;string.h&gt;
+#include	&lt;pthread.h&gt;
+#include	&lt;unistd.h&gt;
+#include	&lt;string&gt;
+
+
+//---			Definition of constants:			---//
+ 
+//  PURPOSE:  To tell how many flowers each bee hive must visit.
+const int	NUM_FLOWERS_TO_COLLECT
+				= 5;
+
+//  PURPOSE:  To tell the number of bee hives that exist.
+const int	NUM_BEE_HIVES	= 4;
+
+//  PURPOSE:  To hold the names of the flowers:
+const char*   	FLOWER_NAME_ARRAY[]
+				= { &quot;Jasmine&quot;,
+				    &quot;Daffodil&quot;,
+				    &quot;Daisy&quot;,
+				    &quot;Stinging Nettle&quot;,
+				    &quot;Venus fly trap&quot;,
+				    &quot;Tumbleweed&quot;,
+				    &quot;Kudzu&quot;,
+				    &quot;Poison Ivy&quot;
+				  };
+
+//  PURPOSE:  To tell how many flower names there are.
+const size_t	NUM_FLOWER_NAMES= sizeof(FLOWER_NAME_ARRAY)/sizeof(const char*);
+
+
+//---		    Definition of classes and structs:			---//
+
+//  PURPOSE:  To represent a flower.
+class		Flower
+{
+  //  I.  Member vars:
+  //  PURPOSE:  To hold address of the name of the flower as a C-string.
+  const char*			nameCPtr_;
+
+  //  PURPOSE:  To hold the address of the Flower instance after &apos;*this&apos; one,
+  //	or &apos;NULL&apos; if there is no such Flower.
+  Flower*			nextPtr_;
+
+  //  II.  Disallowed auto-generated methods:
+  //  No copy constructor:
+  Flower			(const Flower&amp;);
+
+  //  No copy assignment op:
+  Flower&amp;	operator=	(const Flower&amp;);
+
+protected :
+  //  III.  Protected methods:
+
+public :
+  //  IV.  Constructor(s), assignment op(s), factory(s) and destructor:
+  //  PURPOSE:  To make &apos;*this&apos; a stand-alone Flower instance with a randomly-
+  //  	chosen name.  No parameters.  No return value.
+  Flower			() :
+				nameCPtr_(FLOWER_NAME_ARRAY[rand() %
+					  NUM_FLOWER_NAMES]
+					 ),
+				nextPtr_(NULL)
+				{ }
+
+  //  PURPOSE:  To release the resources of &apos;*this&apos;.  No parameters.  No
+  //	return value.
+  ~Flower			()
+				{ }
+
+  //  V.  Accessors:
+  //  PURPOSE:  To return the name of the flower.  No parameters.
+  const char*	getNameCPtr	()
+				const
+				{ return(nameCPtr_); }
+
+  //  PURPOSE:  To return the address of the Flower instance after &apos;*this&apos; one,
+  //	or &apos;NULL&apos; if there is no such Flower.
+  Flower*	getNextPtr	()
+				const
+				{ return(nextPtr_); }
+
+  //  VI.  Mutators:
+  //  PURPOSE:  To note that the next flower in the list has address
+  //	&apos;newNextPtr&apos;.  No return value.
+  void		setNextPtr	(Flower*	newNextPtr
+  				)
+				{ nextPtr_ = newNextPtr; }
+
+  //  VII.  Methods that do main and misc work of class:
+
+};
+
+class		PrivateGarden
+{
+  //  I.  Member vars:
+  <strong>//  YOUR MEMBER VARS HERE</strong>
+
+
+  //  II.  Disallowed auto-created methods:
+  //  No copy constructor:
+  PrivateGarden			(const PrivateGarden&amp;);
+
+  //  No copy assignment op:
+  PrivateGarden&amp;	operator=	(const PrivateGarden&amp;);
+
+protected :
+  //  III.  Protected methods:
+
+public :
+  //  IV.  Constructor(s), assignment op(s), factory(s) and destructor:
+  //  PURPOSE:  To initialize &apos;*this&apos; to an empty garden.  No parameters.
+  //	No return value.
+  PrivateGarden			()
+				{
+				  <strong>//  INITIALIZE HERE</strong>
+				}
+
+  //  PURPOSE:  To release the resources of &apos;*this&apos;.  No parameters.
+  //  	No return value.
+  ~PrivateGarden			()
+				{
+				  <strong>//  GET RID OF LIST HERE</strong>
+				}
+
+  //  V.  Accessor(s):
+  //  PURPOSE:  To hold length of &apos;*this&apos; list.
+  int		getNumFlowers	()
+  				const
+				{ return(0); <strong>/* CHANGE THAT 0 */</strong>}
+
+
+  //  VI.  Mutator(s):
+
+  //  VII.  Methods that do main and misc. work of class:
+  //  PURPOSE:  To add the Flower with address &apos;flowerPtr&apos; at the back of
+  //	&apos;*this&apos; PrivateGarden of Flower instances.  No return value.
+  void		store		(Flower*	flowerPtr
+				)
+				{
+				  <strong>//  ADD TO LIST HERE</strong>
+				}
+
+  //  PURPOSE:  To print this list of Flower instances in &apos;*this&apos; PrivateGarden.
+  //	No parameters.  No return value.
+  void		print		()
+				{
+				  <strong>//  ADD TO LIST HERE</strong>
+				}
+ 
+};
+
+
+struct		Hive
+{
+  std::string			name_;
+  PrivateGarden*		gardenPtr_;
+
+  Hive				() :
+  				name_(&quot;&quot;),
+				gardenPtr_(NULL)
+				{ }
+
+  ~Hive				()
+  				{
+				  delete(gardenPtr_);
+				}
+
+  const char*	getNameCPtr	()
+  				const
+				{ return(name_.c_str()); }
+
+};
+
+
+//---			Definition of global vars:			---//
+
+//  PURPOSE:  To hold the address of the flower offered by the farmer.
+//	or to hold &apos;NULL&apos; if there is no such Flower.
+Flower*		availableFlowerPtr	= NULL;
+
+//  PURPOSE:  To tell how much honey has been produced by the bee hives.
+int		honey			= 0;
+
+<strong>//  YOUR CODE HERE to add global vars to control access to availableFlowerPtr and honey:</strong>
+
+
+//---			Definition of main functions:			---//
+
+//  PURPOSE:  To be the function run by the bee hive threads.  &apos;vPtr&apos; points
+//	to an instance of &apos;Hive&apos;.  Returns &apos;NULL&apos;.
+void*		hive		(void*		vPtr
+				)
+{
+  //  I.  Application validity check:
+
+  //  II.  Get the flowers:
+  //  II.A.  Initialize local vars:
+  Hive*		hivePtr		= NULL;  <strong>// CHANGE THAT NULL</strong>
+  PrivateGarden* gardenPtr	= NULL;  <strong>// CHANGE THAT NULL</strong>
+
+  //  II.B.  Each iteration obtains another Flower instance for the graden
+  //  	     of Hive &apos;*hivePtr&apos;:
+  while  (gardenPtr-&gt;getNumFlowers() &lt; NUM_FLOWERS_TO_COLLECT)
+  {
+    <strong>//  YOUR CODE HERE: Make access to avaialbleFlowerPtr thread-safe</strong>
+
+    while  (availableFlowerPtr == NULL)
+    {
+      printf(&quot;%s: \&quot;Hey!  No flowers, no honey!\&quot;\n&quot;,hivePtr-&gt;getNameCPtr());
+    }
+
+    printf(&quot;%s: \&quot;A %s!  Sure we will take that!\&quot;\n&quot;,
+	   hivePtr-&gt;getNameCPtr(),availableFlowerPtr-&gt;getNameCPtr()
+	  );
+    gardenPtr-&gt;store(availableFlowerPtr);
+    availableFlowerPtr	= NULL;
+
+
+    <strong>//  Leave this outside critical section:</strong>
+    sleep(rand() % 3);	// Please leave this OUT of the critical section
+  }
+
+  //  II.C.  Add to the honey when have enough flowers:
+  printf(&quot;%s \&quot;Finally, enough flowers to make some honey.\&quot;\n&quot;,
+  	 hivePtr-&gt;getNameCPtr()
+	);
+
+  <strong>//  YOUR CODE HERE: Make incrementing honey thread-save</strong>
+  honey++;
+
+  //  III.  Finished:
+  return(NULL);
+}
+
+
+//  PURPOSE:  To be the function run by the farmer thread.  &apos;vPtr&apos; is ignored.
+//	Returns &apos;NULL&apos;.
+void*		farmer		(void*	vPtr)
+{
+  //  I.  Application validity check:
+
+  //  II.  Give flowers:
+  //  II.A.  Each iteration creates and gives another Flower instance
+  //  	     until there is sufficient honey:
+  while  (true)
+  {
+    <strong>//  YOUR CODE HERE: Make access to honey thread-safe</strong>
+    if  (honey &gt;= NUM_BEE_HIVES)
+    {
+      break;
+    }
+
+    printf(&quot;Farmer: \&quot;I have to gather *more* flowers?!?\&quot;\n&quot;);
+
+    <strong>//  YOUR CODE HERE: Make access to availableFlowerPtr thread-safe</strong>
+    while  (availableFlowerPtr != NULL)
+    {
+      printf(&quot;Farmer: \&quot;Hey, you said you wanted&quot;
+      	     &quot; a flower, come and take it.\&quot;\n&quot;
+	    );
+    }
+
+    availableFlowerPtr	= new Flower;
+    printf(&quot;Farmer: \&quot;Okay here is another flower: a %s\&quot;\n&quot;,
+	   availableFlowerPtr-&gt;getNameCPtr()
+	  );
+
+
+    <strong>//  Leave this outside critical section:</strong>
+    sleep(rand() % 3);	// Please leave this OUT of the critical section
+  }
+
+  //  III.  Finished:
+  printf(&quot;Farmer \&quot;I *finally* got my honey!\&quot;\n&quot;);
+  return(NULL);
+}
+
+
+//  PURPOSE:  To run the program.  Ignores command line arguments.  Returns
+//	&apos;EXIT_SUCCESS&apos; to OS.
+int		main		()
+{
+  //  I.  Application validity check:
+
+  //  II.  Have the farmer give Flower instances until sufficient honey
+  //  	   has been obtained:
+  //  II.A.  Randomize random number generator:
+  srand(getpid());
+
+  //  II.B.  Initialize global vars:
+  Hive		hiveArray[NUM_BEE_HIVES];
+  <strong>//  Add something here?</strong>
+
+
+  //  II.C.  Make threads:
+  //  II.C.1.  Make bee hive threads:
+  for  (int i = 0;  i &lt; NUM_BEE_HIVES;  i++)
+  {
+    hiveArray[i].name_		= std::string(&quot;Hive &quot;) + (char)(&apos;A&apos;+i);
+    hiveArray[i].gardenPtr_	= new PrivateGarden;
+    <strong>//  Add something here?</strong>
+  }
+
+  //  II.C.2.  Make farmer thread:
+  <strong>//  Add something here?</strong>
+
+  //  II.D.  Wait for child threads:
+  //  II.D.1.  Wait for bee hive threads:
+  for  (int i = 0;  i &lt; NUM_BEE_HIVES;  i++)
+  {
+    <strong>//  Add something here?</strong>
+    printf(&quot;%s has:\n&quot;,hiveArray[i].getNameCPtr());
+    hiveArray[i].gardenPtr_-&gt;print();
+  }
+
+  //  II.D.2.  Wait for farmer thread:
+  <strong>//  Add something here?</strong>
+
+  //  II.E.  Get rid of global vars:
+  <strong>//  Add something here?</strong>
+
+  //  III.  Finished:
+  return(EXIT_SUCCESS);
+}
+	    </pre>
+	  </li>
+	  <p/>
+
+	  <li>
+	    <h5>Finish <code>PrivateGarden</code>:</h5>
+	    <p>
+	      <code>PrivateGarden</code> must implement a linked list of
+	      <code>Flower</code> instances using the <code>Flower</code>
+	      methods <code>getNextPtr()</code> and <code>setNextPtr()</code>.
+	      (<em>No cheating and using C++ containers like
+		<code>std::list</code>, <code>std::vector</code>, etc.</em>)
+	    </p>
+	    <ol type="1">
+	      <li>
+		Give <code>class PrivateGarden</code> 3 member variables:
+		<ul>
+		  <li>
+		    A <code>Flower*</code> to point
+		    to the beginning of the list.
+		  </li>
+		  <li>
+		    A <code>Flower*</code> to point
+		    to the end of the list.
+		  </li>
+		  <li>
+		    An <code>int</code> that keeps track of the length
+		    of the list.
+		  </li>
+		</ul>
+	      </li>
+	      <p/>
+
+	      <li>
+		Initialize your variables in the constructor.
+	      </li>
+	      <p/>
+
+	      <li>
+		Get rid of your list in the <em>destructor</em> method:
+		<code>~PrivateGarden()</code>.
+		In C one gets memory with <code>malloc()</code> and gives it
+		back with <code>free()</code>.
+		However, in C++ one gets memory and builds an instance of an
+		object with <code>new</code>,
+		and one dismantles the instance with <code>delete()</code>.<br/>
+		Please have a local variable like <code>flowerPtr</code>
+		and say <code>delete(flowerPtr)</code> for each
+		<code>Flower</code> in the list.
+	      </li>
+	      <p/>
+
+	      <li>
+		Make <code>getNumFlowers()</code> return the how many
+		<code>Flower</code> instances are in the list.
+	      </li>
+	      <p/>
+
+	      <li>
+		Make <code>store()</code> add new <code>Flower</code> instance
+		<code>flowerPtr</code> to the end of the list.
+	      </li>
+	      <p/>
+
+	      <li>
+		Make <code>print()</code> print the <code>Flower</code>
+		instances in the list.
+	      </li>
+	      <p/>
+
+	    </ol>
+	  </li>
+	  <p/>
+
+	  <li>
+	    <h5>Make it multi-threaded:</h5>
+	    <ol type="1">
+	      <li>
+		In <code>main()</code> you will need a single
+		<code>pthread_t</code> for the farmer thread,
+		and an array of <code>NUM_BEE_HIVES</code>
+		<code>pthread_t</code> instances for the bee hive threads.
+		<ol type="a">
+		  <li>
+		    Declare your variables in section <code>II.B</code>.
+		  </li>
+		  <li>
+		    Start your threads in section <code>II.C</code>.
+		    The bee hive threads should run <code>hive()</code>
+		    with the address of <code>hiveArray[i]</code>
+		    passed to them.
+		    The farmer thread should run <code>farmer()</code>.
+		    Just pass <code>NULL</code> as the argument to
+		    <code>farmer()</code>.
+		  </li>
+		  <li>
+		    In section <code>II.D</code> wait for all child threads
+		    to finish.
+		  </li>
+		</ol>		
+	      </li>
+	      <p/>
+
+	      <li>
+		In <code>hive()</code>, argument <code>vPtr</code> comes in
+		pointing to a <code>Hive</code>.
+		Set <code>hivePtr</code> equal to <code>vPtr</code>
+		(you will need to cast it),
+		and set <code>gardenPtr</code> equal to the address of
+		the <code>PrivateGarden</code> owned by the Hive.
+		(See <code>struct Hive</code>.)
+	      </li>
+	      <p/>
+
+	      <li>
+		<strong>Now run it!</strong>
+	      </li>
+	      <p/>
+
+	    </ol>
+	  </li>
+	  <p/>
+
+	  <li>
+	    <h5>Make it thread-safe:</h5>
+	    <p>
+	      Congratulations!
+	      If you got this far you have made it <em>multi-threaded</em>,
+	      but not <em>thread-safe</em>.<br/>
+	      To make it thread-safe you will have to add some
+	      <em>mutex(es)</em> and <em>condition(s)</em>.
+	    </p>
+	    <p>
+	      You need to protect access to two variables:
+	      <ul>
+		<li>
+		  <code>availableFlowerPtr</code>, under 
+		  <code>Definition of global vars:</code>.
+		  This one acts like a one-element buffer.
+		  <ul>
+		    <li>
+		      The farmer thread has to wait while it has
+		      a non-<code>NULL</code> value (&quot;is-full&quot;).
+		    </li>
+		    <li>
+		      The bee hive threads have to wait while it has
+		      a <code>NULL</code> value (&quot;is-empty&quot;).
+		    </li>
+		  </ul>
+		</li>
+		<li>
+		  <code>honey</code>, also under 
+		  <code>Definition of global vars:</code>.
+		  Unlike <code>availableFlowerPtr</code>,
+		  there is no need to wait to use this variable.
+		</li>
+	      </ul>
+	    </p>
+
+	    <ol type="a">
+	      <li>
+		<strong>Stop!  Think!</strong>
+		What needs mutexes?
+		What needs conditions?
+	      </li>
+	      <li>
+		Declare your variables globally
+		in the <code>Definition of global vars:</code> section
+	      </li>
+	      <li>
+		Initialize those variables in <code>main()</code>
+		in section <code>II.B.</code>
+	      </li>
+	      <li>
+		Destroy those variables in <code>main()</code>
+		in section <code>II.E.</code>
+	      </li>
+	      <li>
+		Use them in <code>farmer</code> to protect access to
+		both <code>honey</code> and <code>availableFlowerPtr</code>.
+	      </li>
+	      <li>
+		Use them in <code>hive</code> to protect access to
+		both <code>availableFlowerPtr</code> and <code>honey</code>.
+	      </li>
+	    </ol>
+	  </li>
+	  <p/>
+
+	  <li>
+	    <h5>Questions:</h5>
+	    <p>
+      	      <strong>How well did your program work before making it thread safe?</strong>
+	    </p>
+	    <p>
+      	      <strong>How well did your program work after making it thread safe?</strong>
+	    </p>
+	  </li>
+	  <p/>
+
+	  <li>
+	    <h5>Sample output:</h5>
+	    <pre>
+$ <strong>./hungryBees </strong>
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Dandelion&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Hey, you said you wanted a flower, come and take it.&quot;
+Hive A: &quot;A Dandelion!  Sure we will take that!&quot;
+Hive C: &quot;Hey!  No flowers, no honey!&quot;
+Hive B: &quot;Hey!  No flowers, no honey!&quot;
+Hive D: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;Okay here is another flower: a Daisy&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Hey, you said you wanted a flower, come and take it.&quot;
+Hive C: &quot;A Daisy!  Sure we will take that!&quot;
+Farmer: &quot;Okay here is another flower: a Dandelion&quot;
+Hive B: &quot;A Dandelion!  Sure we will take that!&quot;
+Hive B: &quot;Hey!  No flowers, no honey!&quot;
+Hive A: &quot;Hey!  No flowers, no honey!&quot;
+Hive C: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Jasmine&quot;
+Hive D: &quot;A Jasmine!  Sure we will take that!&quot;
+Hive D: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Poison Ivy&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Hey, you said you wanted a flower, come and take it.&quot;
+Hive B: &quot;A Poison Ivy!  Sure we will take that!&quot;
+Farmer: &quot;Okay here is another flower: a Daffodil&quot;
+Hive A: &quot;A Daffodil!  Sure we will take that!&quot;
+Hive A: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Hive B: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;Okay here is another flower: a Daffodil&quot;
+Hive C: &quot;A Daffodil!  Sure we will take that!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Poison Ivy&quot;
+Hive D: &quot;A Poison Ivy!  Sure we will take that!&quot;
+Hive D: &quot;Hey!  No flowers, no honey!&quot;
+Hive C: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Daisy&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Hey, you said you wanted a flower, come and take it.&quot;
+Hive A: &quot;A Daisy!  Sure we will take that!&quot;
+Farmer: &quot;Okay here is another flower: a Daisy&quot;
+Hive B: &quot;A Daisy!  Sure we will take that!&quot;
+Hive A: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Hive B: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;Okay here is another flower: a Daffodil&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Hey, you said you wanted a flower, come and take it.&quot;
+Hive D: &quot;A Daffodil!  Sure we will take that!&quot;
+Farmer: &quot;Okay here is another flower: a Tumbleweed&quot;
+Hive C: &quot;A Tumbleweed!  Sure we will take that!&quot;
+Hive D: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Tumbleweed&quot;
+Hive A: &quot;A Tumbleweed!  Sure we will take that!&quot;
+Hive C: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Poison Ivy&quot;
+Hive A: &quot;A Poison Ivy!  Sure we will take that!&quot;
+Hive A &quot;Finally, enough flowers to make some honey.&quot;
+Hive B: &quot;Hey!  No flowers, no honey!&quot;
+Hive A has:
+ Dandelion
+ Daffodil
+ Daisy
+ Tumbleweed
+ Poison Ivy
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Poison Ivy&quot;
+Hive D: &quot;A Poison Ivy!  Sure we will take that!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Dandelion&quot;
+Hive C: &quot;A Dandelion!  Sure we will take that!&quot;
+Hive D: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Daffodil&quot;
+Hive C: &quot;A Daffodil!  Sure we will take that!&quot;
+Hive C &quot;Finally, enough flowers to make some honey.&quot;
+Hive B: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Venus fly trap&quot;
+Hive D: &quot;A Venus fly trap!  Sure we will take that!&quot;
+Hive D &quot;Finally, enough flowers to make some honey.&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Okay here is another flower: a Poison Ivy&quot;
+Farmer: &quot;I have to gather *more* flowers?!?&quot;
+Farmer: &quot;Hey, you said you wanted a flower, come and take it.&quot;
+Hive B: &quot;A Poison Ivy!  Sure we will take that!&quot;
+Hive B: &quot;Hey!  No flowers, no honey!&quot;
+Farmer: &quot;Okay here is another flower: a Daffodil&quot;
+Hive B: &quot;A Daffodil!  Sure we will take that!&quot;
+Hive B &quot;Finally, enough flowers to make some honey.&quot;
+Hive B has:
+ Dandelion
+ Poison Ivy
+ Daisy
+ Poison Ivy
+ Daffodil
+Hive C has:
+ Daisy
+ Daffodil
+ Tumbleweed
+ Dandelion
+ Daffodil
+Hive D has:
+ Jasmine
+ Poison Ivy
+ Daffodil
+ Poison Ivy
+ Venus fly trap
+Farmer &quot;I *finally* got my honey!&quot;
+	    </pre>
+	  </li>
+	  <p/>
+	</ol>
+      </li>
+    </ol>
+  </body>
+</html>

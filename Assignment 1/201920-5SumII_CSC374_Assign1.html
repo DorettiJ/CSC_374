@@ -1,0 +1,596 @@
+<!doctype html>
+<html lang="en_US">
+  <head>
+    <meta http-equiv="content-type" content="text/html; charset=UTF-8"> 
+    <title>CSC 374: Computer Systems II: 2020 Summer II, Assignment #1</title>
+    <style>
+      H2 { text-align: center }
+      H3 { text-align: center }
+    </style>
+  </head>
+
+  <body>
+    <h2>CSC 374: Computer Systems II: 2020 Summer II<br/>Assignment #1</h2>
+    <h3>Last Modified 2020 July 23</h3>
+
+    <h4>Purpose:</h4>
+    To go over:
+    <ul>
+      <li>Compiler optimizations</li>
+      <li>Program profiling (timing)</li>
+      <li>Header files</li>
+      <li>Linking and object file layout</li>
+    </ul>
+
+    <h4>Computing</h4>
+    <p>
+      Please <a href="http://www.putty.org/">ssh</a> into one of the following:
+      <ul>
+	<li>140.192.36.184</li>
+	<li>140.192.36.185</li>
+	<li>140.192.36.186</li>
+	<li>140.192.36.187</li>
+      </ul>
+      or use your own Linux machine.
+    </p>
+
+    <p>
+      Please submit a .zip file
+      (<em>not</em> .7z or any other non-standard compression!)
+      file of your header file <em>and</em>
+      a .txt/.pdf/.doc/.odt file containing your answer to the questions.
+    </p>
+
+    <ol type="1">
+      <li>
+	<h4>Please copy-and-paste the following files (0 Points):</h4>
+	<h5>insertionSort.c</h5>
+	<p>
+	  <pre>
+/*-------------------------------------------------------------------------*
+ *---									---*
+ *---		insertionSort.c						---*
+ *---									---*
+ *---	    This file defines a function that implements the insertion-	---*
+ *---	sort algorithm.							---*
+ *---									---*
+ *---	----	----	----	----	----	----	----	----	---*
+ *---									---*
+ *---	Version 1a					Joseph Phillips	---*
+ *---									---*
+ *-------------------------------------------------------------------------*/
+
+#include	&quot;header.h&quot;
+
+//  PURPOSE:  To sort the &apos;arrayLen&apos; strings in array &apos;array&apos; with the
+//	insertion-sort algorithm.  No return value.
+void		insertionSort	(char**		array,
+				 int		arrayLen
+				)
+{
+  int	i;
+  int	j;
+
+  for  (i = 0;  i &lt; arrayLen-1;  i++)
+    for  (j = i+1;  j &lt; arrayLen;  j++)
+      if  ( strncmp(array[i],array[j],strLen) &gt; 0 )
+	swap(array,i,j);
+}
+	  </pre>
+	</p>
+
+	<h5>quickSort.c</h5>
+	<p>
+	  <pre>
+/*-------------------------------------------------------------------------*
+ *---									---*
+ *---		quickSort.c						---*
+ *---									---*
+ *---	    This file defines a function that implements the quick-sort	---*
+ *---	algorithm.							---*
+ *---									---*
+ *---	----	----	----	----	----	----	----	----	---*
+ *---									---*
+ *---	Version 1b					Joseph Phillips	---*
+ *---									---*
+ *-------------------------------------------------------------------------*/
+
+#include	&quot;header.h&quot;
+
+
+int		partition	(char**		array,
+				 char*		pivot,
+				 int		lo,
+				 int		hi
+				)
+{
+  lo--;
+  hi++;
+
+  while  (1)
+  {
+    do
+    {
+      lo++;
+    }
+    while  (strncmp(array[lo],pivot,strLen) &lt; 0);
+
+    do
+    {
+      hi--;
+    }
+    while  (strncmp(array[hi],pivot,strLen) &gt; 0);
+
+    if  (lo &gt;= hi)
+      break;
+
+    swap(array,lo,hi);
+  }
+
+  return(hi);
+}
+
+
+int		pivot		(char**		array,
+				 int		lo,
+				 int		hi
+				)
+{
+  char*	atLo	= array[lo];
+  char*	atMid	= array[(lo+hi)/2];
+  char*	atHi	= array[hi];
+
+  if  ( ((strncmp(atLo,atMid,strLen)&lt;=0) &amp;&amp; (strncmp(atMid,atHi,strLen)&lt;=0))  ||
+        ((strncmp(atLo,atMid,strLen)&gt;=0) &amp;&amp; (strncmp(atMid,atHi,strLen)&gt;=0))
+      )
+    return((lo+hi)/2);
+
+  if  ( ((strncmp(atMid,atLo,strLen)&lt;=0) &amp;&amp; (strncmp(atLo,atHi,strLen)&lt;=0))  ||
+	((strncmp(atMid,atLo,strLen)&gt;=0) &amp;&amp; (strncmp(atLo,atHi,strLen)&gt;=0))
+	)
+    return(lo);
+
+  return(hi);
+}
+
+
+void		quickSort_	(char**		array,
+				 int		lo,
+				 int		hi
+				)
+{
+  if  (lo &lt; hi)
+  {
+    int	left;
+    int	right;
+    int	p	= pivot(array,lo,hi);
+
+    p		= partition(array,array[p],lo,hi);
+    quickSort_(array,lo,p);
+    quickSort_(array,p+1,hi);
+  }
+}
+
+
+//  PURPOSE:  To sort the &apos;arrayLen&apos; strings in array &apos;array&apos; with the
+//	quick-sort algorithm.  No return value.
+void		quickSort	(char**		array,
+				 int		arrayLen
+				)
+{
+  quickSort_(array,0,arrayLen-1);
+}
+	  </pre>
+	</p>
+
+      </li>
+      <p/>
+
+      <li>
+	<h4>C programming (20 Points):</h4>
+	<p>
+	  These two files need a <code>main()</code> to run their functions
+	  <code>insertionSort()</code> and <code>quickSort()</code>.
+	  Then all three C files need a header file to inform them of what
+	  the others have that they need.
+	  Please finish both the <code>main()</code> and <code>header.h</code>.
+	</p>
+	<p>
+	  <em>Please note!</em>
+	  Not everything needs to be shared.
+	  <ul>
+	    <li>
+	      <code>main()</code> needs
+	      <code>insertionSort()</code> and <code>quickSort()</code>
+	    </li>
+	    <li>
+	      Both <code>insertionSort()</code> and <code>quickSort()</code>
+	      need <code>swap()</code> and <code>strLen</code>.
+	    </li>
+	  </ul>
+	  Otherwise, it is best <em>not</em> to share too much,
+	  kind of like keeping methods and members <code>private</code> in
+	  C++ and Java.
+	</p>
+	<h5>header.h</h5>
+	<p>
+	  <pre>
+/*-------------------------------------------------------------------------*
+ *---									---*
+ *---		header.h						---*
+ *---									---*
+ *---	----	----	----	----	----	----	----	----	---*
+ *---									---*
+ *---	Version 1a					Joseph Phillips	---*
+ *---									---*
+ *-------------------------------------------------------------------------*/
+
+#include	&lt;stdlib.h&gt;
+#include	&lt;stdio.h&gt;
+#include	&lt;string.h&gt;
+
+<strong>// YOUR CODE HERE</strong>
+	  </pre>
+	</p>
+	<h5>main.c</h5>
+	<p>
+	  <pre>
+/*-------------------------------------------------------------------------*
+ *---									---*
+ *---		main.c							---*
+ *---									---*
+ *---	    This file defines the variable strLen and function swap()	---*
+ *---	needed for the program of assignment 1.				---*
+ *---									---*
+ *---	----	----	----	----	----	----	----	----	---*
+ *---									---*
+ *---	Version 1a					Joseph Phillips	---*
+ *---									---*
+ *-------------------------------------------------------------------------*/
+
+#include	&quot;header.h&quot;
+
+#define		TEXT_LEN	256
+
+
+//  PURPOSE:  To tell the length of the strings to sort.
+int		strLen;
+
+
+//  PURPOSE:  To swap the strings in &apos;array[]&apos; at indices &apos;index0&apos; and &apos;index1&apos;.
+//	No return value.
+void		swap		(char**		array,
+				 int		index0,
+				 int		index1
+				)
+{
+<strong>  // YOUR CODE HERE</strong>
+}
+
+
+//  PURPOSE:  To repeatedly ask the user the text &quot;Please enter &quot;, followed
+//	by the text in &apos;descriptionCPtr&apos;, followed by the numbers &apos;min&apos; and
+//	&apos;max&apos;, and to get an entered integer from the user.  If this entered
+//	integer is either less than &apos;min&apos;, or is greater than &apos;max&apos;, then
+//	the user is asked for another number.  After the user finally enters
+//	a legal number, this function returns that number.
+int		obtainIntInRange(const char*	descriptionCPtr,
+				 int   		min,
+				 int		max
+				)
+{
+  int		entry;
+  char		text[TEXT_LEN];
+
+<strong>  // YOUR CODE HERE</strong>
+
+  return(entry);
+}
+
+
+//  PURPOSE:  To generate the array of strings.
+char**		generateStringArray
+				(int	numStrings
+				)
+{
+  char**	array = (char**)calloc(numStrings,sizeof(char*));
+  int		i;
+  int		j;
+
+  for  (i = 0;  i &lt; numStrings;  i++)
+  {
+    array[i]	= (char*)malloc(strLen);
+
+    for  (j = 0;  j &lt; strLen;  j++)
+    {
+      array[i][j] = (rand() % 16) + &apos;A&apos;;
+    }
+
+  }
+
+  return(array);
+}
+
+
+void		print		(char**		array,
+				 int		arrayLen
+				)
+{
+  int	i;
+  int	j;
+
+  for  (i = 0;  i &lt; arrayLen;  i++)
+  {
+    for  (j = 0;  j &lt; strLen;  j++)
+    {
+      putchar(array[i][j]);
+    }
+
+    putchar(&apos;\n&apos;);
+  }
+
+}
+
+
+void		releaseMem	(char**		array,
+				 int		arrayLen
+				)
+{
+  int	i;
+
+  for  (i = 0;  i &lt; arrayLen;  i++)
+  {
+    free(array[i]);
+  }
+
+  free(array);
+}
+
+
+int		main		()
+{
+  int		arrayLen;
+  char**	array;
+  int		choice;
+
+  arrayLen = obtainIntInRange(&quot;number of strings&quot;,1,65536*16);
+  strLen   = obtainIntInRange(&quot;length of each string&quot;,1,16);
+  choice   = obtainIntInRange(&quot;1 for insertion sort or 2 for quicksort&quot;,1,2);
+  array	   = generateStringArray(arrayLen);
+
+  switch  (choice)
+  {
+  case 1 :
+    insertionSort(array,arrayLen);
+    break;
+
+  case 2 :
+    quickSort(array,arrayLen);
+    break;
+  }
+
+  print(array,arrayLen);
+  releaseMem(array,arrayLen);
+  return(EXIT_SUCCESS);
+}
+	  </pre>
+	</p>
+
+	<p>
+	  <h4>Sample Initial Output:</h4>
+	  <pre>
+$ <strong>./assign1 </strong>
+Please enter number of strings (1-1048576): <strong>0</strong>
+Please enter number of strings (1-1048576): <strong>200000000</strong>
+Please enter number of strings (1-1048576): <strong>32</strong>
+Please enter length of each string (1-16): <strong>3</strong>
+Please enter 1 for insertion sort or 2 for quicksort (1-2): <strong>1</strong>
+BID
+BMH
+BNM
+CEB
+CLD
+CNH
+DBP
+DDP
+EBO
+EIL
+FHI
+GKO
+GLE
+GMC
+HAJ
+HGJ
+HKM
+IHN
+ILM
+IMK
+JKG
+JOE
+KFN
+KMJ
+LCN
+LCP
+LGP
+MAL
+MEM
+NKL
+OBB
+OBO	  </pre>
+	</p>
+	
+      <li>
+	<h4>Timing: Part 1 (20 Points):</h4>
+	Compile and run the program without any extra optimizations,
+	but with <em>profiling</em> for timing:
+	<pre>
+gcc -c -pg -O0 main.c
+gcc -c -pg -O0 insertionSort.c
+gcc -c -pg -O0 quickSort.c
+gcc main.o insertionSort.o quickSort.o -pg -O0 -o assign1-0</pre>
+	<em>Run the program twice</em>
+	timing it both times, and answer the following:
+
+	<ol type="a">
+	  <li>
+	    <em>
+	      How for 65536 strings of length 8 how many <strong>self seconds</strong>
+	      did <code>insertionSort()</code> take?
+	    </em>
+	  </li>
+	  <p/>
+	  <li>
+	    <em>
+	      How for 65536 strings of length 8 how many <strong>self seconds</strong>
+	      did <code>quickSort_()</code> take?
+	    </em>
+	  </li>
+	</ol>
+
+      </li>
+      <p/>
+
+      <li>
+	<h4>Timing: Part 2 (20 Points):</h4>
+	Compile and run the program <em>with</em> optimization,
+	but with <em>profiling</em> for timing:
+
+	<pre>
+gcc -c -pg -O2 main.c
+gcc -c -pg -O2 insertionSort.c
+gcc -c -pg -O2 quickSort.c
+gcc main.o insertionSort.o quickSort.o -pg -O2 -o assign1-2</pre>
+	<em>Run the program twice</em>
+	timing it both times, and answer the following:
+
+	<ol type="a">
+	  <li>
+	    <em>
+	      How for 65536 strings of length 8 how many <strong>self seconds</strong>
+	      did <code>insertionSort()</code> take?
+	    </em>
+	  </li>
+	  <p/>
+	  <li>
+	    <em>
+	      How for 65536 strings of length 8 how many <strong>self seconds</strong>
+	      did <code>quickSort_()</code> take?
+	    </em>
+	  </li>
+	</ol>
+
+      </li>
+      <p/>
+
+      <li>
+	<h4>Algorithm choice vs. Compiler optimization (Points 10):</h4>
+	<p>
+	  Which is faster?
+	  <ul>
+	    <li>A bad algorithm and data-structure optimized with -O2</li>
+	    <li>A good algorithm and data-structure optimized with -O0</li>
+	  </ul>
+	</p>
+      </li>
+      <p/>
+
+      <li>
+	<h4>Parts of an executable (Points 20):</h4>
+	Please find the following inside of <code>assign1-0</code>
+	by using <code>objdump</code>.
+	<ul>
+	  <li>
+	    If it <em>can</em> be found then <em>both</em>
+	    <ol type="a">
+	      <li>Give the <code>objdump</code> command, and</li>
+	      <li>Show the <code>objdump</code> result</li>
+	    </ol>
+	  </li>
+	  <p/>
+
+	  <li>
+	    If it <em>cannot</em> be found then tell why not.
+	    Where in the memory of the runtime process is it?
+	  </li>
+	</ul>
+	<p/>
+
+	Look for:
+	<ol type="a">
+	  <li>The string <code>&quot;number of strings&quot;</code> in <code>main()</code></li>
+	  <li>The code for <code>releaseMem()</code></li>
+	  <li>The global variable <code>strLen</code></li>
+	  <li>The local variable <code>choice</code> in <code>main()</code></li>
+	</ol>
+	<table border="1">
+	  <tr><th>Question</th> <th align="center">Command</th> <th align="center">Result</th></tr>
+	  <tr>
+	    <td>(A)</td>
+	    <td valign="bottom">______________________</td>
+	    <td valign="bottom">
+	      <pre>
+
+
+
+
+
+
+________________________________ </pre>
+	    </td>
+	  </tr>
+	  <tr>
+	    <td>(B)</td>
+	    <td valign="bottom">______________________</td>
+	    <td valign="bottom">
+	      <pre>
+
+
+
+
+
+
+________________________________ </pre>
+	    </td>
+	  </tr>
+	  <tr>
+	    <td>(C)</td>
+	    <td valign="bottom">______________________</td>
+	    <td valign="bottom">
+	      <pre>
+
+
+
+
+
+
+________________________________ </pre>
+	    </td>
+	  </tr>
+	  <tr>
+	    <td>(D)</td>
+	    <td valign="bottom">______________________</td>
+	    <td valign="bottom">
+	      <pre>
+
+
+
+
+
+
+________________________________ </pre>
+	    </td>
+	  </tr>
+	</table>
+      </li>
+      <p/>
+
+      <li>
+	<h4>Compiler optimizations (Points 10):</h4>
+	Compare the assembly code of <code>assign1-0</code> with
+	<code>assign1-2</code>.
+	<em>Find</em> and <em>show</em> at least <strong>2</strong> optimizations that the compiler did to make <code>assign1-2</code> run faster than <code>assign1-0</code>.
+      </li>
+
+    </ol>
+  </body>
+</html>
